@@ -1,0 +1,43 @@
+PDF Buffer to PNG Buffer in Node.js.
+- After scanning the internet, I could not find any working NPM packages for converting pdfs to pngs in memory. The closest I found was a library that converts pdfs to pngs but requires that you save the png file somehwhere in the directory (pdf2pic). Other libraries were deprecated or did not work correctly. All of these packages usually rely on the ImageMagick OS binary, which you can use yourself in the code to convert pdfs to pngs in Node.js. You just need to open a child process using the Node.js spawn function. You can run the following code to take in a PDF buffer and return a png buffer of the first page of the PDF:
+
+import { spawn } from "child_process";
+
+/**
+ * method for converting a pdf buffer to a png buffer.
+ * uses the imagemagick binary.
+ */
+export async function getPdfPreview(pdfBuffer: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('convert', [
+      '-density', '150',
+      'pdf:-[0]',           // Read PDF from stdin, first page only
+      '-quality', '90',
+      '-resize', '120x120',
+      'png:-'               // Write PNG to stdout
+    ]);
+
+    const chunks: Buffer[] = [];
+    const errors: Buffer[] = [];
+
+    child.stdout.on('data', (chunk) => chunks.push(chunk));
+    child.stderr.on('data', (chunk) => errors.push(chunk));
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(chunks));
+      } else {
+        reject(new Error(`ImageMagick failed: ${Buffer.concat(errors).toString()}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(new Error(`ImageMagick not found. Install with: brew install imagemagick`));
+    });
+
+    child.stdin.write(pdfBuffer);
+    child.stdin.end();
+  });
+}
+
+- This is the equivalent of spawning the ImageMagick CLI tool convert. You pass the array of arguments to it, density specifies the render resolution, pdf:- tells it to read a pdf from stdin, [0] tells it to only read the first page, png:- sends the png to stdout, -quality specifies the png quality, and resize specifies the scale image. You create buffer arrays after that, then on the child stdout (which will be the png buffer), you just take the chunk an dpush it to our chunks buffer, do the same with any error. Then on child close we check for an error and handle it if so, otherwise we return our png buffer. At the end of all that we send our pdf buffer in for the code we wrote and explained above to handle it.
