@@ -193,3 +193,38 @@ expiry.setMinutes(expiry.getMinutes() + 59); // take off a minute to be safe, it
 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+In C, all functions are pass by value, never pass by reference. Huge difference here when coming from higher level languages. This forces us to use double pointers often,
+heres why:
+
+int *pInt = (int*)malloc(sizeof(int));
+
+// let's say we wanted to pass this pointer to a function and change what it actually points to (ignore the fact that this is specific example is bad practice because it
+// will leave a memory leak)
+
+void badFunction(int *p) {
+    p = createPointer(); // set our pointer to a function that returns a pointer
+}
+
+// this is a bad function because the pointer being passed is just by value. the function receives the value of the pointer. when you go to set it to something else, it is 
+// not the actual pointer passed from above being changed, but a copy of that being changed, badFunction's copy of it. so we are just setting the function's version 
+// of the pointer, not the real pointer. using double pointers solves this, here is an example doing that:
+
+int **pInt = (int*)malloc(sizeof(int));
+
+void goodFunction(int **p) {
+    *p = createPointer();
+}
+
+// this time, we pass a pointer to a pointer. so even though goodFunction is just receiving a copy of the value of the pointer, we can dereference it and change the pointer
+// it points to in the memory, thus changing the actual pointer we have intended to change.
+
+outerPointer -> innerPointer -> value
+
+function(outerPointer) {
+    dereference outPointer to get the location it points to, set that (which is innerPointer) to the new memory address for it to point to.
+}
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
