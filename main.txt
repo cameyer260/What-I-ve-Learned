@@ -96,4 +96,100 @@ export async function getPdfText(pdfBuffer: Buffer): Promise<string> {
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+Quick Git Notes
 
+When you are making a new feature or bug fix or whatever, use the following to create a seperate branch to work on it on:
+
+git checkout -b feature/name
+
+or
+
+git branch feature/name
+git checkout feature/name
+
+Then work on the feature, use git add. and git commit -m, push to github has well with git push origin feature/name.
+Once it is completed and all working and ready for deployment, merge to main. To do this locally do:
+
+git checkout main # switch to main
+git pull origin main # make sure your main is up to date 
+git merge feature/name 
+
+# solve any merge conflicts in your editor, then git add . and git commit -m
+
+# now you have merged the feature branch to main, you can now push to github 
+git push origin main
+
+# optionally cleanup branches as well
+git branch -d feature/name # delete branch locally
+git push origin --delete feature/name # delete branch from github as well
+
+To do this on github (better for large features, staying organized, and working with others), you create a pull request on github after pushing
+your feature branch to it. Then you can solve the merge conflicts if there are any and github will merge the branches to main and the tests and 
+CI/CD will run. For simplicity and being a solo developer, doing it locally may be the better option for now.
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AWS S3 File/Image upload, and how to get a presigned url for them in Node.js.
+
+First off make sure you have your bucket created, with an IAM user with at least get put and delete object commands, I just do admin priveledges to keep things simple.
+Then only things you'll need to change from default config is adding the following CORS configuration in the permissions tab. Make sure you block public access and have
+no conflicting ACLs or bucket policies as well. Here is the CORS config:
+
+[
+    {
+        "AllowedHeaders": [
+            "*"
+        ],
+        "AllowedMethods": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "HEAD"
+        ],
+        "AllowedOrigins": [
+            "*"
+        ],
+        "ExposeHeaders": [],
+        "MaxAgeSeconds": 86400
+    }
+]
+
+Then, after uploading the file to s3, you can get your presigned url. You'll first need to make sure you have downloaded @aws-sdk/s3-request-presigner via npm.
+Then, you can import it like so: import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+Then, you need to make a seperate s3 client to use your getPresignedUrl for because we'll need to disable a default that enforces the upload headers to be the 
+exact same as the get headers, which they will not. Here is that client config:
+
+export const presignedUrlClient = new S3Client({
+  region: "us-east-2",
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY as string,
+    secretAccessKey: process.env.S3_SECRET_KEY as string,
+  },
+  // DISABLE all defaults that add upload-specific headers
+  forcePathStyle: false,
+});
+
+Then you can get the presigned url. The entire upload/getPresignedUrl code will look like this. For deeper information, feel free to visit my project repo I am pulling
+these examples from: https://github.com/cameyer260/docuquery 
+
+const previewName = `user-${userId}/previews/${formData.get("name")}.png`;
+const putPreviewCommand = new PutObjectCommand({
+  Bucket: "docuquery-files",
+  Key: previewName,
+  Body: previewBuffer,
+  ContentType: "image/png",
+});
+await s3client.send(putPreviewCommand);
+awsPreview = previewName;
+
+const getPreviewCommand = new GetObjectCommand({
+  Bucket: "docuquery-files",
+  Key: previewName,
+});
+const url = await getSignedUrl(presignedUrlClient, getPreviewCommand, { expiresIn: 3600 }); // 60 minutes
+const expiry = new Date();
+expiry.setMinutes(expiry.getMinutes() + 59); // take off a minute to be safe, it might take time for these lines of code to run
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
